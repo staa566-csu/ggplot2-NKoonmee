@@ -1,0 +1,292 @@
+---
+title: "ggplot2-STAA566"
+author: "Nat Koonmee"
+date: '2022-09-21'
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = F)
+
+library("readxl")
+library(dplyr)
+library(ggpubr)
+library(tidyverse)
+library(ggplot2)
+library(gapminder)
+library(TSstudio)
+library(hrbrthemes)
+library(scales)
+library(lubridate)
+library(caret)
+```
+
+
+## Header
+
+This is Fort Collins temperature report datasets from https://ccc.atmos.colostate.edu/~autowx/fclwx_access.php \newline
+We could see from the table below that in each day, there are 24 temperature reports which mean inorder to get a daily temperature, we need to conbind those hourly to daily.\newline
+The last columns on the datasets is a West Nile Virus report from https://cdphe.colorado.gov/animal-related-diseases/west-nile-virus/west-nile-virus-and-your-health which is also, an open source.
+
+```{r}
+df = read.csv("DF_allcases.csv")
+df <- df %>% select(2,3,4,6,7,9,11,12,13,15,16,17,18,19,20)
+name <- c("index", "date", "time", "TempC", "Humidity", "DewPointC", "WindMS", "WindDir", "GustMS", "GustDir", "Pressure", "Solar", "PrecIN", "PrecMM", "WNVCasesReport")
+colnames(df) <- name
+df$date <- as.Date(df$date, format = "%m/%d/%Y")
+head(df)
+
+```
+
+```{r}
+# colors <- c("Avg Temp." = "cyan4", "Min Temp." = "cornflowerblue", "Max Temp." = "brown1")
+# 
+# dftemp <- df %>% select(c(2,4))
+# tempavg <- aggregate(dftemp[2], by= dftemp[1], mean)
+# tempmin <- aggregate(dftemp[2], by= dftemp[1], min)
+# tempmax <- aggregate(dftemp[2], by= dftemp[1], max)
+# tempdata <- data.frame(Date_MST = tempavg[,1], 
+#                        Average_temperature = tempavg[,2],
+#                        Min_temperature = tempmin[,2],
+#                        Max_temperature = tempmax[,2])
+# 
+# p <- ggplot(tempdata) + 
+#   # geom_line(aes(x = Date_MST, y = Average_temperature), color = "Avg Temp.") + 
+#   # geom_line(aes(x = Date_MST, y = Min_temperature), color = "Min Temp.") +
+#   # geom_line(aes(x = Date_MST, y = Max_temperature), color = "Max Temp.") + theme_bw() + 
+#   geom_line(aes(x = Date_MST, y = Average_temperature), color = "cornflowerblue") + 
+#   geom_line(aes(x = Date_MST, y = Min_temperature), color = "cyan4") +
+#   geom_line(aes(x = Date_MST, y = Max_temperature), color = "brown1") + 
+#   labs(x = "year", y = "Temperature", color = "Legend") + scale_color_manual(values = colors) 
+# 
+# 
+# p
+```
+
+
+```{r}
+colors <- c("AvgTemp" = "cyan4", "MinTemp" = "cornflowerblue", "MaxTemp" = "brown1")
+
+dftemp <- df %>% select(c(2,4))
+tempavg <- aggregate(dftemp[2], by= dftemp[1], mean)
+tempmin <- aggregate(dftemp[2], by= dftemp[1], min)
+tempmax <- aggregate(dftemp[2], by= dftemp[1], max)
+tempdata <- data.frame(Date_MST = tempavg[,1], 
+                       Average_temperature = tempavg[,2],
+                       Min_temperature = tempmin[,2],
+                       Max_temperature = tempmax[,2])
+
+p <- ggplot(tempdata, aes(x = Date_MST)) + 
+  geom_line(aes(y = Average_temperature), colour  = 'cyan4') +
+  geom_line(aes(y = Min_temperature), colour   = "cornflowerblue") +
+  geom_line(aes(y = Max_temperature), colour  = 'brown1')  +
+  labs(x = "year", y = "Temperature (C)", color = "Legend", title = "Daily Temperature at Fort Collins from 2002 to 2022") +
+  scale_colour_manual(name = "ll",
+    values = c("cyan4" = "cyan4", "cornflowerblue" = "cornflowerblue", "brown1" = "brown1"),
+                      labels = c("l1", "l2", "l3")) +
+  theme_bw() 
+
+
+p
+
+
+```
+
+We could see from this plot, that looking for daily temp. plot does not help anything much, since there are too many information and noise.
+
+
+```{r}
+# yearly <- tempdata %>%
+#   mutate(date = year(Date_MST)) %>%
+#   group_by(date) %>%
+#   summarize(average = mean(Average_temperature), min = min(Average_temperature), max = max(Average_temperature))
+# p <- ggplot(yearly) + 
+#   geom_line(aes(x = date, y = average), color = "cyan4") + 
+#   geom_line(aes(x = date, y = min), color = "cornflowerblue") +
+#   geom_line(aes(x = date, y = max), color = "brown1") + theme_bw()
+# 
+# 
+# p
+
+```
+
+
+```{r}
+yearly <- tempdata %>%
+  mutate(date = year(Date_MST)) %>%
+  group_by(date) %>%
+  summarize(average = mean(Average_temperature), min = mean(Min_temperature), max = mean(Max_temperature))
+p <- ggplot(yearly) + 
+  geom_line(aes(x = date, y = average), color = "cyan4") + 
+  geom_line(aes(x = date, y = min), color = "cornflowerblue") +
+  geom_line(aes(x = date, y = max), color = "brown1") + theme_bw() +
+  labs(x = "year", y = "Temperature (C)", title = "Yearly Temperature at Fort Collins from 2002 to 2022")
+
+
+p
+```
+
+Instead of plotting daily temperature, we still do not receive a lot of information from yearly Temperature, it is still almost a flat line, and there is no pattern or any correlation.
+
+
+```{r}
+name_month = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", 'Aug', 'Seb', "Oct", "Nov", "Dec")
+ month <- tempdata %>%
+  mutate(date = month(Date_MST)) %>%
+  group_by(date) %>%
+  summarize(average = mean(Average_temperature), min = min(Average_temperature), max = max(Average_temperature))
+p <- ggplot(month) + 
+  geom_line(aes(x = date, y = average), color = "cyan4") + 
+  geom_line(aes(x = date, y = min), color = "cornflowerblue") +
+  geom_line(aes(x = date, y = max), color = "brown1") + theme_bw()+ 
+  labs(x = "Month", y = "Temperature(C)")
+  # scale_x_discrete(labels = name_month)
+
+p
+
+p2 <- ggplot(month, aes(x = date, y = average)) + 
+  geom_point() + geom_line() +
+  geom_smooth(method = "loess") + theme_bw()
+
+p2
+
+
+```
+
+Now, we can see a pattern of average Temp by month through 20 years, we could see that during month 6 - 7 or June - July is the peak of the Temp. in Fort Collins.
+
+```{r}
+
+
+tempdata["Year"] = ''
+tempdata["Month"] = ""
+for (i in 1:length(tempdata[,1])){
+  tempOutput = format(as.Date(tempdata[i, 1], format="%Y/%m/%d"),"%Y")
+  tempdata[i, 5] = tempOutput
+  
+  tempdata[i, 6] = format(as.Date(tempdata[i, 1], format="%Y/%m/%d"),"%m")
+}
+
+
+
+ # Yearly <- tempdata %>%
+ #  group_by(Year) %>%
+ #  summarize(average = mean(Average_temperature), min = mean(Min_temperature), max = mean(Max_temperature))
+ 
+
+ 
+ p <- ggplot(tempdata) + 
+  geom_boxplot(aes(x = Month, y = Average_temperature)) + theme_bw()
+
+p
+
+
+```
+
+```{r}
+
+```
+
+
+```{r}
+ggplot(df, aes(x = Humidity)) + geom_histogram(aes(y = ..density..),binwidth = 3, color ="black", fill = "white") + geom_density(alpha=.2, fill="#FF6666") +
+  theme_bw() +
+  labs(title = "Histogram or Humidity from 2002 to 2020")
+  
+df1 <- df
+df1["Humidity > 50"] = "No"
+df1["Year"] = ''
+df1["Month"] = ""
+
+for (i in 1:length(df1[,1])){
+  # temp = "No"
+  if (df1[i,5] < 50){
+    df1[i,16] = "Yes"
+  }
+  
+  tempOutput = format(as.Date(df1[i, 2], format="%Y/%m/%d"),"%Y")
+  df1[i, 17] = tempOutput
+  
+  df1[i, 18] = format(as.Date(df1[i, 2], format="%Y/%m/%d"),"%m")
+  
+}  
+  
+
+```
+
+
+
+
+
+
+
+```{r}
+weather2022 <- df1 %>% filter(Year == "2022")
+
+
+ggplot(weather2022, aes(x = weather2022$GustMS, y = weather2022$WindMS, color = weather2022$`Humidity > 50`, fill = weather2022$`Humidity > 50`)) + geom_point(alpha = .3) + labs(x = "Guest Speed Meter per second", y = "Wind Speed Meter per second", colour = "is Humidty greater than 50")
+
+```
+
+```{r}
+weather2022 <- df1 %>% filter(Year == "2022" & WindMS < 3 & GustMS < 7.5)
+
+
+ggplot(weather2022, aes(x = weather2022$GustMS, y = weather2022$WindMS, color = weather2022$`Humidity > 50`, fill = weather2022$`Humidity > 50`)) + geom_point(alpha = .3) + labs(x = "Guest Speed Meter per second", y = "Wind Speed Meter per second", colour = "is Humidty greater than 50")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
